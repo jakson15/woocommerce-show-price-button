@@ -1,0 +1,10 @@
+{
+    "name": "woocomerce-show-price-button",
+    "version": "1.0",
+    "description": "Company website for Verpama Technology",
+    "require": {
+        "php": ">=7.0.0",
+        "wp-coding-standards/wpcs": "*",
+        "dealerdirect/phpcodesniffer-composer-installer": "^0.4.3"
+    }
+}
