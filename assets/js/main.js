@@ -1,23 +1,26 @@
+jQuery('.price').hide();
+jQuery('.cart').hide();
+
 jQuery('#submit-price').click(function() {
     jQuery('#submit-price').hide();
+    jQuery('.price').show();
+    jQuery('.cart').show();
 });
 
 jQuery('#submit-price').click(ajaxSubmit);
 
 function ajaxSubmit() {
-
-    var form = 'jQuery(this).serialize()';
+    var form = jQuery('#spfw_form').serialize();
 
     jQuery.ajax({
         type: "POST",
-        url: admin_url.ajax_url,
-        data: {
-            action: 'show_price',
-            form: form
+        url: "/wordpress/wp-admin/admin-ajax.php",
+        data: form,
+        success() {
         },
-        success: function(result) {
-            alert(result);
+        error() {
         }
+
     });
 
     return false;

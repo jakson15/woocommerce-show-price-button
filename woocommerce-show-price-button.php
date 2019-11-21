@@ -1,10 +1,10 @@
 <?php
 /**
- * Plugin Name: Show price button for Woocommerce
- * Description: Simple plugin to track your users habbits in checking price
- * Author: Piotr Josko
- * Author URI:  http://wordpressdesign.pl/
- * Version: 1.0
+ * Plugin Name:  Show price button for Woocommerce
+ * Description:  Simple plugin to track your users habbits in checking price.
+ * Author:       Piotr Josko
+ * Author URI:   http://wordpressdesign.pl/
+ * Version:      1.0
  * License:      GPL2
  * License URI:  https://www.gnu.org/licenses/gpl-2.0.html
  *
@@ -13,6 +13,25 @@
 
 require_once ABSPATH . 'wp-admin/includes/plugin.php';
 if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
+	/**
+	 * Create date base
+	 */
+	function spfw_careate_database_structure() {
+		global $wpdb;
+		$table_name      = $wpdb->prefix . 'spfw_data';
+		$charset_collate = $wpdb->get_charset_collate();
+
+		$sql = "CREATE TABLE $table_name (
+			ID mediumint(9) NOT NULL AUTO_INCREMENT,
+			time DATETIME DEFAULT '0000-00-00 00:00:00' NOT NULL,
+			user_id INT NOT NULL,
+			product_id INT NOT NULL,
+			PRIMARY KEY  (id)
+		) $charset_collate;";
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		dbDelta( $sql );
+	}
+	register_activation_hook( __FILE__, 'spfw_careate_database_structure' );
 
 	if ( ! class_exists( 'Show_Price' ) ) {
 		/**
@@ -25,13 +44,15 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 			 */
 			public function __construct() {
 				add_action( 'admin_menu', array( $this, 'show_price_options_page' ) );
-				add_action( 'wp_enqueue_scripts', array( __CLASS__, 'script' ) );
+				add_action( 'wp_enqueue_scripts', array( $this, 'script' ) );
+				add_action( 'admin_enqueue_scripts', array( $this, 'script' ) );
 				add_filter( 'woocommerce_get_sections_products', array( $this, 'show_price_add_section' ) );
 				add_filter( 'woocommerce_get_settings_products', array( __CLASS__, 'show_price_all_settings' ), 10, 2 );
 				add_filter( 'woocommerce_get_price_html', array( $this, 'remove_price_shop' ) );
-				add_filter( 'woocommerce_get_price_html', array( $this, 'remove_price_single_product' ) );
+				add_filter( 'woocommerce_before_add_to_cart_form', array( $this, 'remove_price_single_product' ) );
 				add_action( 'wp_ajax_show_price', array( $this, 'show_price' ) );
 				add_action( 'wp_ajax_nopriv_show_price', array( $this, 'show_price' ) );
+				add_action( 'wp_ajax_show_price', array( $this, 'get_user_data' ) );
 			}
 
 			/**
@@ -50,12 +71,18 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 			/**
 			 * Hide price on product page
 			 */
-			public static function script() {
+			public function script() {
 				if ( is_product() && 'yes' === get_option( 'show-price-product-page' ) ) {
-					wp_enqueue_script( 'hide_price', plugins_url( 'assets/js/main.js', __FILE__ ), '', '1.0', true );
-					wp_localize_script( 'show_price', 'admin_url', array( 'url' => admin_url( 'admin-ajax.php' ) ) );
+					wp_enqueue_script( 'hide_price', plugins_url( 'assets/js/main.js', __FILE__ ), array( 'jquery' ), '1.0', true );
+					wp_localize_script(
+						'show_price',
+						'admin_url',
+						array(
+							'url' => admin_url( 'admin-ajax.php' ),
+						)
+					);
 				} elseif ( is_shop() && 'yes' === get_option( 'show-price-shop-page' ) ) {
-					wp_enqueue_script( 'hide_price', plugins_url( 'assets/js/main.js', __FILE__ ), '', '1.0', true );
+					wp_enqueue_script( 'hide_price', plugins_url( 'assets/js/main.js', __FILE__ ), array( 'jquery' ), '1.0', true );
 				}
 			}
 
@@ -66,24 +93,18 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 			 */
 			public function remove_price_single_product( $price ) {
 				if ( is_product() && 'yes' === get_option( 'show-price-product-page' ) ) {
-					$this->remove_add_to_cart_button();
-
-					$current_user = wp_get_current_user();
-					global $wp;
 					if ( ! is_user_logged_in() ) {
-						$current_user->user_email = $this->get_user_ip();
+						$user_id = 0;
+					} else {
+						$user_id = get_current_user_id();
 					}
-					$current_user->user_email;
-					$dzisiaj     = date( 'Y-m-d  h:i' );
-					$current_url = home_url( $wp->request );
 
 					?>
-						<form id="form" method="post" action="" name="form">
-							<input type="hidden" name="current_user" id="current_user" value="<?php echo esc_attr( $current_user->user_email ); ?>">
-							<input type="hidden" name="dzisiaj" id="dzisiaj" value="<?php echo esc_attr( $dzisiaj ); ?>">
-							<input type="hidden" name="current_url" id="current_url" value="<?php echo esc_attr( $current_url ); ?>">
+						<form id="spfw_form" method="post" action="" name="spfw_form">
+							<input type="hidden" name="user_id" id="user_id" value="<?php echo esc_attr( $user_id ); ?>">
+							<input type="hidden" name="product_id" id="product_id" value="<?php echo esc_attr( get_the_ID() ); ?>">
 							<input type="hidden" name="action" value="show_price"/>
-							<button class="cena" id="submit-price" type="button" NAME="submit"><?php esc_html_e( 'Pokaż cenę', 'show price' ); ?></button>
+							<button class="cena" id="submit-price" type="button" name="submit"><?php esc_html_e( 'Pokaż cenę', 'show price' ); ?></button>
 						</form>
 					<?php
 					return false;
@@ -98,31 +119,52 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 			 */
 			public function show_price() {
 
-				if ( ! empty( $_POST ) ) {
+				if ( ! empty( $_POST ) && 'show_price' === $_POST['action'] ) {
+					$user_id    = ( filter_var( wp_unslash( $_POST['user_id'] ), FILTER_VALIDATE_INT ) ) ? filter_var( wp_unslash( $_POST['user_id'] ), FILTER_VALIDATE_INT ) : 0;
+					$product_id = ( filter_var( wp_unslash( $_POST['product_id'] ), FILTER_VALIDATE_INT ) ) ? filter_var( wp_unslash( $_POST['product_id'] ), FILTER_VALIDATE_INT ) : false;
 
-						print_r( $_POST );
-						die();
-						return false;
+					if ( 0 <= $user_id && $product_id ) {
+						$passed_data = $this->set_user_data( $user_id, $product_id );
+						if ( $passed_data ) {
+							wp_send_json_success();
+						}
+					}
 				}
-				return false;
+				wp_send_json_error();
 			}
 
 			/**
-			 * Retrieve IP address of user.
+			 * Function is save user data in datebase.
+			 *
+			 * @param int $user_id    User id.
+			 * @param int $product_id Product id.
 			 */
-			public function get_user_ip() {
-				if ( isset( $_SERVER['HTTP_CLIENT_IP'] ) && ! empty( $_SERVER['HTTP_CLIENT_IP'] ) ) {
-					$ip = filter_var( wp_unslash( $_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP ) );
-				} elseif ( isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) && ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-					$ip = filter_var( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'], FILTER_VALIDATE_IP ) );
-				} else {
-					$ip = ( isset( $_SERVER['REMOTE_ADDR'] ) ) ? filter_var( wp_unslash( $_SERVER['REMOTE_ADDR'] ), FILTER_VALIDATE_IP ) : '0.0.0.0';
+			private function set_user_data( $user_id, $product_id ) {
+				global $wpdb;
+				$table_name = $wpdb->prefix . 'spfw_data';
+				$saved = $wpdb->insert( // phpcs:ignore
+					$table_name,
+					array(
+						'time'       => current_time( 'mysql' ),
+						'user_id'    => $user_id,
+						'product_id' => $product_id,
+					)
+				);
+
+				if ( $saved ) {
+					return true;
 				}
-				$ip = filter_var( $ip, FILTER_VALIDATE_IP );
-				$ip = ( false === $ip ) ? '0.0.0.0' : $ip;
-				return $ip;
 			}
 
+			/**
+			 * Function is save user data in datebase.
+			 */
+			public function get_user_data() {
+				global $wpdb;
+				$table_name = $wpdb->prefix . 'spfw_data';
+				$rows       = $wpdb->get_results( "SELECT * FROM $table_name", ARRAY_A );
+				return $rows;
+			}
 
 			/**
 			 * Hide price on shop page
@@ -150,7 +192,59 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 			 * Create Woocommerce Show price admin page html
 			 */
 			public function show_price_options_page_html() {
-				echo 'coś';
+				$users_data = $this->get_user_data();
+				?>
+
+				<!-- Datatable CSS -->
+				<link href='//cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css' rel='stylesheet' type='text/css'>
+
+				<!-- Datatable JS -->
+				<script src="//cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
+
+				<div class="wrap">
+				<!-- Table -->
+				<table id="user_data" class="display" style="width:100%">
+					<h1 class="wp-heading-inline">Show Price data</h1>
+					<thead>
+						<tr>
+							<th>ID</th>
+							<th>User email</th>
+							<th>Product</th>
+							<th>Time</th>
+						</tr>
+					</thead>
+					<tbody>
+					<?php
+					foreach ( $users_data as $user ) {
+						$user_email = ( 0 === (int) $user['user_id'] ) ? 'Guest' : get_user_by( 'ID', $user['user_id'] )->user_email;
+						?>
+						<tr>
+							<td><?php echo esc_html( $user['ID'] ); ?></td>
+							<td><?php echo esc_html( $user_email ); ?></td>
+							<td><?php echo esc_html( get_page_link( $user['product_id'] ) ); ?></td>
+							<td><?php echo esc_html( $user['time'] ); ?></td>
+						</tr>
+					<?php } ?>
+					</tbody>
+					<tfoot>
+						<tr>
+							<th>ID</th>
+							<th>User email</th>
+							<th>Product</th>
+							<th>Time</th>
+						</tr>
+					</tfoot>
+				</table>
+				</div>
+
+				<script>
+				jQuery(document).ready(function() {
+					jQuery('#user_data').DataTable( {
+					} );
+				} );
+				</script>
+
+				<?php
 			}
 
 			/**
