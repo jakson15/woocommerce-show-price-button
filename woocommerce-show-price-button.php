@@ -84,6 +84,8 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 				} elseif ( is_shop() && 'yes' === get_option( 'show-price-shop-page' ) ) {
 					wp_enqueue_script( 'hide_price', plugins_url( 'assets/js/main.js', __FILE__ ), array( 'jquery' ), '1.0', true );
 				}
+				wp_enqueue_script( 'datatables_js', plugins_url( 'assets/js/datatables.min.js', __FILE__ ), array( 'jquery' ), '1.0', true );
+				wp_enqueue_style( 'datatables_css', plugins_url( 'assets/css/datatables.min.css', __FILE__ ), '', '1.0' );
 			}
 
 			/**
@@ -195,12 +197,6 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 				$users_data = $this->get_user_data();
 				?>
 
-				<!-- Datatable CSS -->
-				<link href='//cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css' rel='stylesheet' type='text/css'>
-
-				<!-- Datatable JS -->
-				<script src="//cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
-
 				<div class="wrap">
 				<!-- Table -->
 				<table id="user_data" class="display" style="width:100%">
@@ -221,7 +217,7 @@ if ( is_plugin_active( 'woocommerce/woocommerce.php' ) ) {
 						<tr>
 							<td><?php echo esc_html( $user['ID'] ); ?></td>
 							<td><?php echo esc_html( $user_email ); ?></td>
-							<td><?php echo esc_html( get_page_link( $user['product_id'] ) ); ?></td>
+							<td><a href="<?php echo esc_url( get_page_link( $user['product_id'] ) ); ?>"><?php echo esc_html( get_the_title( $user['product_id'] ) ); ?></a></td>
 							<td><?php echo esc_html( $user['time'] ); ?></td>
 						</tr>
 					<?php } ?>
